@@ -9,4 +9,7 @@
 # No es necesario transitividad, 
 # Si es necesario guardar las claves de forma local.
 
-# Debe estar modularizado
+# Debe estar modularizado y con debidos prints
+
+
+

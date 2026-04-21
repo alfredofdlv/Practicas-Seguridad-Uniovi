@@ -1,4 +1,4 @@
-Posibles ejercicios :
+Posibles ejercicios examen que dijo el profesor :
 
 - Asimetrico,
 - Simetrico

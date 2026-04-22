@@ -62,7 +62,7 @@ def recibir_mensaje(origen, destino, clave_compartida, mensaje_cifrado):
         print(f'Mensaje descifrado resultante: "{mensaje_descifrado.decode("utf-8")}"')
         return mensaje_descifrado
     except Exception as e:
-        print("❌ Error al descifrar. ¿La clave es correcta o el mensaje fue alterado?")
+        print(" Error al descifrar. ¿La clave es correcta o el mensaje fue alterado?")
 
 
 # ==========================================

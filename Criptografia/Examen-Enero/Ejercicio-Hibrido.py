@@ -1,9 +1,7 @@
-import os
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa, padding as asym_padding
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.primitives import padding as sym_padding
+from cryptography.fernet import Fernet
 from cryptography.exceptions import InvalidSignature
 
 # ==========================================
@@ -77,67 +75,58 @@ def verificar_firma(mensaje, firma, pub_key):
 
 
 # ==========================================
-# 3. CIFRADO Y DESCIFRADO HÍBRIDO (AES + RSA)
+# 3. CIFRADO Y DESCIFRADO HÍBRIDO (Fernet + RSA)
 # ==========================================
 
 def cifrar_hibrido(mensaje, pub_key_destino):
     
     """
     Cifra un mensaje de forma hibrida:
-    1. Genera una clave simetrica de un solo uso (AES).
-    2. Cifra el mensaje con AES (muy rapido, sin limites de tamano).
-    3. Cifra la clave AES usando la publica RSA del destino.
+    1. Genera una clave simetrica de un solo uso (Fernet).
+    2. Cifra el mensaje con Fernet (muy rapido, sin limites de tamano).
+    3. Cifra la clave Fernet usando la publica RSA del destino.
     """
     print(' [Cifrado] Iniciando cifrado hibrido...')
     
-    # 1. Crear clave simetrica y vector de inicializacion (IV)
-    clave_aes = os.urandom(32) # AES-256
-    iv = os.urandom(16)        # IV de 16 bytes para AES-CBC
+    # 1. Crear clave simetrica Fernet
+    clave_fernet = Fernet.generate_key()
     
-    # 2. Cifrar el mensaje con AES (Simétrico)
-    print('   -> Cifrando el mensaje con AES-256-CBC...')
-    padder = sym_padding.PKCS7(128).padder() # AES bloque es 128 bits
-    mensaje_padded = padder.update(mensaje) + padder.finalize()
+    # 2. Cifrar el mensaje con Fernet (Simétrico)
+    print('   -> Cifrando el mensaje con Fernet...')
+    f = Fernet(clave_fernet)
+    mensaje_cifrado_fernet = f.encrypt(mensaje)
     
-    cipher = Cipher(algorithms.AES(clave_aes), modes.CBC(iv), backend=default_backend())
-    encryptor = cipher.encryptor()
-    mensaje_cifrado_aes = encryptor.update(mensaje_padded) + encryptor.finalize()
-    
-    # 3. Cifrar la clave AES con RSA (Asimétrico)
-    print('   -> Cifrando la clave AES con la publica RSA del destino...')
-    clave_aes_cifrada_rsa = pub_key_destino.encrypt(
-        clave_aes,
+    # 3. Cifrar la clave Fernet con RSA (Asimétrico)
+    print('   -> Cifrando la clave Fernet con la publica RSA del destino...')
+    clave_fernet_cifrada_rsa = pub_key_destino.encrypt(
+        clave_fernet,
         asym_padding.OAEP(mgf=asym_padding.MGF1(algorithm=hashes.SHA256()), algorithm=hashes.SHA256(), label=None)
     )
     
     # Retornamos el paquete con todo lo necesario para descifrar: 
-    # la clave AES cifrada, el IV (no pasa nada si viaja en claro) y el mensaje cifrado
-    return clave_aes_cifrada_rsa, iv, mensaje_cifrado_aes
+    # la clave Fernet cifrada con RSA y el mensaje cifrado.
+    # Fernet ya gestiona su propio Vector de Inicializacion (IV) por dentro.
+    return clave_fernet_cifrada_rsa, mensaje_cifrado_fernet
 
-def descifrar_hibrido(clave_aes_cifrada_rsa, iv, mensaje_cifrado_aes, priv_key_destino):
+def descifrar_hibrido(clave_fernet_cifrada_rsa, mensaje_cifrado_fernet, priv_key_destino):
     """
     Descifra un mensaje híbrido:
-    1. Descifra la clave AES usando la clave privada RSA.
-    2. Descifra el mensaje con AES usando la clave recuperada.
+    1. Descifra la clave Fernet usando la clave privada RSA.
+    2. Descifra el mensaje con Fernet usando la clave recuperada.
     """
     print(' [Descifrado] Iniciando descifrado hibrido...')
     
-    # 1. Recuperar la clave AES usando RSA privada
-    print('   -> Recuperando clave AES usando RSA privada...')
-    clave_aes = priv_key_destino.decrypt(
-        clave_aes_cifrada_rsa,
+    # 1. Recuperar la clave Fernet usando RSA privada
+    print('   -> Recuperando clave Fernet usando RSA privada...')
+    clave_fernet = priv_key_destino.decrypt(
+        clave_fernet_cifrada_rsa,
         asym_padding.OAEP(mgf=asym_padding.MGF1(algorithm=hashes.SHA256()), algorithm=hashes.SHA256(), label=None)
     )
     
-    # 2. Descifrar el mensaje con AES
-    print('   -> Descifrando el mensaje con AES-256-CBC...')
-    cipher = Cipher(algorithms.AES(clave_aes), modes.CBC(iv), backend=default_backend())
-    decryptor = cipher.decryptor()
-    mensaje_padded = decryptor.update(mensaje_cifrado_aes) + decryptor.finalize()
-    
-    # Quitar el padding
-    unpadder = sym_padding.PKCS7(128).unpadder()
-    mensaje = unpadder.update(mensaje_padded) + unpadder.finalize()
+    # 2. Descifrar el mensaje con Fernet
+    print('   -> Descifrando el mensaje con Fernet...')
+    f = Fernet(clave_fernet)
+    mensaje = f.decrypt(mensaje_cifrado_fernet)
     
     return mensaje
 
@@ -153,20 +142,17 @@ def enviar_mensaje(origen, destino, priv_origen, pub_destino, mensaje):
     # 1. Origen firma el mensaje en claro para demostrar autoria
     firma = firmar_mensaje(mensaje, priv_origen)
     
-    # 2. Origen empaqueta todo cifrandolo de forma hibrida
-    # Nota: para este ejercicio, enviare la firma a parte del texto cifrado,
-    # aunque en hibrido puro podriamos concatenar [mensaje + firma] y cifrarlo con AES!
-    # Lo dejamos separado para ver claramente la verificacion vs descifrado.
-    clave_aes_rsa, iv, msg_aes = cifrar_hibrido(mensaje, pub_destino)
+    # 2. Origen empaqueta todo cifrandolo de forma hibrida usando Fernet
+    clave_fernet_rsa, msg_fernet = cifrar_hibrido(mensaje, pub_destino)
     
     print('>> Enviando paquete de datos por la red... <<')
-    return clave_aes_rsa, iv, msg_aes, firma
+    return clave_fernet_rsa, msg_fernet, firma
 
-def recibir_mensaje(origen, destino, priv_destino, pub_origen, clave_aes_rsa, iv, msg_aes, firma):
+def recibir_mensaje(origen, destino, priv_destino, pub_origen, clave_fernet_rsa, msg_fernet, firma):
     print(f'\n=================[ {destino} RECIBE DE {origen} ]=================')
     
-    # 1. El destino abre el "candado hibrido" para obtener el mensaje en claro
-    mensaje_recuperado = descifrar_hibrido(clave_aes_rsa, iv, msg_aes, priv_destino)
+    # 1. El destino abre el "candado hibrido" (Fernet + RSA) para obtener el mensaje en claro
+    mensaje_recuperado = descifrar_hibrido(clave_fernet_rsa, msg_fernet, priv_destino)
     print(f'Mensaje recuperado: "{mensaje_recuperado.decode("utf-8")}"')
     
     # 2. Verifica que realmente fue el origen quien lo envio

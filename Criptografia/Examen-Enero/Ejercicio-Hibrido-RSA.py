@@ -83,7 +83,7 @@ def cifrar_hibrido(mensaje, pub_key_destino):
     """
     Cifra un mensaje de forma hibrida:
     1. Genera una clave simetrica de un solo uso (Fernet).
-    2. Cifra el mensaje con Fernet (muy rapido, sin limites de tamano).
+    2. Cifra el mensaje con Fernet (muy rapido, sin limites de tamaño).
     3. Cifra la clave Fernet usando la publica RSA del destino.
     """
     print(' [Cifrado] Iniciando cifrado hibrido...')
@@ -92,7 +92,7 @@ def cifrar_hibrido(mensaje, pub_key_destino):
     clave_fernet = Fernet.generate_key()
     
     # 2. Cifrar el mensaje con Fernet (Simétrico)
-    print('   -> Cifrando el mensaje con Fernet...')
+    print('-> Cifrando el mensaje con Fernet...')
     f = Fernet(clave_fernet)
     mensaje_cifrado_fernet = f.encrypt(mensaje)
     
@@ -100,8 +100,11 @@ def cifrar_hibrido(mensaje, pub_key_destino):
     print('   -> Cifrando la clave Fernet con la publica RSA del destino...')
     clave_fernet_cifrada_rsa = pub_key_destino.encrypt(
         clave_fernet,
-        asym_padding.OAEP(mgf=asym_padding.MGF1(algorithm=hashes.SHA256()), algorithm=hashes.SHA256(), label=None)
-    )
+        asym_padding.OAEP(
+            mgf=asym_padding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
+            label=None)
+         )
     
     # Retornamos el paquete con todo lo necesario para descifrar: 
     # la clave Fernet cifrada con RSA y el mensaje cifrado.

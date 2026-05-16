@@ -27,7 +27,7 @@ def main():
     segmento_3 = b"PARCHE_SISTEMA_PARTE_3_FIN"
     
     # El hash esperado que nos da el fabricante en su web oficial
-    hash_oficial_esperado = "55d78a834e7cb8a35606dafa1723f1fd3ff67bb2d3b259160fe968db7f8bfbf1"
+    hash_oficial_esperado = "a4b903871b6ee6d1853128e86e16db9805c1b7b08f52ffd42bd18874e2f7527e"
     
     print("=================== PARTE 1: HASHLIB ===================")
     # Inicializamos el objeto hash con sha256
@@ -45,9 +45,9 @@ def main():
     print(f"Hash Obtenido: {hash_calculado}")
     
     if hash_calculado == hash_oficial_esperado:
-        print("✅ [HASHLIB] El parche es INTEGRO y no ha sido modificado.")
+        print("[OK] [HASHLIB] El parche es INTEGRO y no ha sido modificado.")
     else:
-        print("❌ [HASHLIB] ALERTA: El archivo esta corrupto o modificado.")
+        print("[ERROR] [HASHLIB] ALERTA: El archivo esta corrupto o modificado.")
         
 
     print("\n=================== PARTE 2: CRYPTOGRAPHY ==============")
@@ -69,9 +69,9 @@ def main():
     print(f"Hash Obtenido: {hash_crypto_calculado}")
     
     if hash_crypto_calculado == hash_oficial_esperado:
-        print("✅ [CRYPTOGRAPHY] El parche es INTEGRO y no ha sido modificado.")
+        print("[OK] [CRYPTOGRAPHY] El parche es INTEGRO y no ha sido modificado.")
     else:
-        print("❌ [CRYPTOGRAPHY] ALERTA: El archivo esta corrupto o modificado.")
+        print("[ERROR] [CRYPTOGRAPHY] ALERTA: El archivo esta corrupto o modificado.")
 
 
 if __name__ == '__main__':

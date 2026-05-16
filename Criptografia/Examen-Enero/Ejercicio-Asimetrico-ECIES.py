@@ -69,12 +69,12 @@ def verificar_firma(mensaje, firma_bytes, pub_hex):
     try:
         es_valida = pub_key.verify_msg_hash(mensaje_hash, firma)
         if es_valida:
-            print('   ✅ Firma CORRECTA. El mensaje es auténtico.')
+            print('   [OK] Firma CORRECTA. El mensaje es autentico.')
             return True
         else:
             raise ValidationError("Firma invalida")
     except Exception:
-        print('   ❌ ERROR: La firma no coincide.')
+        print('   [ERROR] La firma no coincide.')
         return False
 
 

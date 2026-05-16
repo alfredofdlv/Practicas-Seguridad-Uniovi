@@ -1,0 +1,3 @@
+medicoA,1fV4U5/odExUn4wWOlyzWw==,di8VbB85n9A94bgg3kg4qlI5aEZ0E+LNs1UolgpVYXc=
+medicoB,h13oZIO9muZQ8NhIY9nMAw==,k0dZMw+AGpMe74qijfySIlpC90aCbCTo8Nnl6GbIaAY=
+medicoC,C0zP+FVdcL2l/BznXhJsdg==,k7a/6jBOCvViIrWvu/At9g7pYJrErBj7ved+/Vmxygw=

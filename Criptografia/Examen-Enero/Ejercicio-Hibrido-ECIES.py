@@ -1,3 +1,4 @@
+import ecies
 from ecies.utils import generate_eth_key
 from ecies import encrypt, decrypt
 from cryptography.fernet import Fernet
@@ -33,9 +34,9 @@ def verificar_firma(mensaje, firma_bytes, pub_hex):
     pub_key = keys.PublicKey(bytes.fromhex(pub_hex.replace('0x', '')))
     firma = keys.Signature(firma_bytes)
     if pub_key.verify_msg_hash(mensaje_hash, firma):
-        print('   ✅ Firma CORRECTA.')
+        print('Firma CORRECTA.')
     else:
-        print('   ❌ ERROR de firma.')
+        print('ERROR de firma.')
 
 
 # ==========================================
@@ -53,7 +54,7 @@ def cifrar_hibrido(mensaje, pub_hex_destino):
     
     # 3. Cifrar la clave Fernet usando la publica ECC (Asimetrico con ECIESpy)
     print('   -> Cifrando clave Fernet con ECIES (Hex publico)...')
-    clave_fernet_cifrada = encrypt(pub_hex_destino, clave_fernet)
+    clave_fernet_cifrada = ecies.encrypt(pub_hex_destino, clave_fernet)
     
     return clave_fernet_cifrada, mensaje_cifrado_fernet
 
@@ -61,7 +62,7 @@ def descifrar_hibrido(clave_fernet_cifrada, mensaje_cifrado_fernet, priv_hex_des
     print(' [Descifrado] Iniciando descifrado hibrido (Fernet + ECIES)...')
     
     # 1. Recuperar la clave Fernet usando la privada ECC de eciespy
-    clave_fernet = decrypt(priv_hex_destino, clave_fernet_cifrada)
+    clave_fernet = ecies.decrypt(priv_hex_destino, clave_fernet_cifrada)
     
     # 2. Descifrar el mensaje con Fernet
     f = Fernet(clave_fernet)

@@ -1,0 +1,109 @@
+\usepackage{fontspec}
+\usepackage{newunicodechar}
+\usepackage{amssymb}
+\newunicodechar{✓}{\checkmark}
+
+\setmainfont{Latin Modern Roman}
+\setsansfont{Latin Modern Sans}
+\setmonofont{Consolas}[Scale=0.85]
+
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{fvextra}
+\usepackage{framed}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins,breakable}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{hyperref}
+
+% Paleta
+\definecolor{titleblue}{HTML}{1B4F72}
+\definecolor{sectionblue}{HTML}{2874A6}
+\definecolor{subgray}{HTML}{566573}
+\definecolor{consejoframe}{HTML}{27AE60}
+\definecolor{consejobg}{HTML}{E8F8F0}
+\definecolor{importanteframe}{HTML}{E67E22}
+\definecolor{importantebg}{HTML}{FEF5E7}
+\definecolor{codebg}{HTML}{F4F6F7}
+\definecolor{codeframe}{HTML}{D5D8DC}
+\definecolor{quotebar}{HTML}{2874A6}
+\definecolor{footgray}{HTML}{7F8C8D}
+
+\hypersetup{colorlinks=true, linkcolor=sectionblue, urlcolor=sectionblue, citecolor=sectionblue}
+
+% Titulos con color
+\titleformat{\section}{\Large\bfseries\color{titleblue}}{}{0pt}{}[\color{titleblue}\titlerule]
+\titlespacing*{\section}{0pt}{1.5ex plus 0.3ex}{1ex}
+
+\titleformat{\subsection}{\large\bfseries\color{sectionblue}}{}{0pt}{}
+\titlespacing*{\subsection}{0pt}{1.2ex plus 0.2ex}{0.8ex}
+
+\titleformat{\subsubsection}{\normalsize\bfseries\color{subgray}}{}{0pt}{}
+\titlespacing*{\subsubsection}{0pt}{1ex plus 0.2ex}{0.6ex}
+
+\titleformat{\paragraph}{\normalsize\bfseries\color{subgray}}{}{0pt}{}
+\titleformat{\subparagraph}{\normalsize\bfseries\color{subgray}}{}{0pt}{}
+\titlespacing*{\paragraph}{0pt}{1.2ex plus 0.2ex}{0.8ex}
+\titlespacing*{\subparagraph}{0pt}{1ex plus 0.2ex}{0.6ex}
+
+% Cajas CONSEJO / IMPORTANTE (Divs del filtro Lua)
+\newtcolorbox{consejobox}{
+  breakable,
+  colback=consejobg,
+  colframe=consejoframe,
+  boxrule=0.8pt,
+  arc=3pt,
+  left=6pt,
+  right=6pt,
+  top=4pt,
+  bottom=4pt,
+  fonttitle=\bfseries,
+  title={Consejo}
+}
+\newtcolorbox{importantebox}{
+  breakable,
+  colback=importantebg,
+  colframe=importanteframe,
+  boxrule=0.8pt,
+  arc=3pt,
+  left=6pt,
+  right=6pt,
+  top=4pt,
+  bottom=4pt,
+  fonttitle=\bfseries,
+  title={Importante}
+}
+\newenvironment{consejo}{\begin{consejobox}}{\end{consejobox}}
+\newenvironment{importante}{\begin{importantebox}}{\end{importantebox}}
+
+% Bloques de codigo resaltados (python, powershell) con fondo gris
+\definecolor{shadecolor}{HTML}{F4F6F7}
+
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
+\DefineVerbatimEnvironment{verbatim}{Verbatim}{breaklines}
+
+% Citas con barra lateral
+\usepackage{mdframed}
+\mdfdefinestyle{quotebox}{
+  linecolor=quotebar,
+  linewidth=4pt,
+  leftline=true,
+  rightline=false,
+  topline=false,
+  bottomline=false,
+  backgroundcolor=white,
+  innerleftmargin=10pt,
+  innerrightmargin=6pt,
+  skipabove=6pt,
+  skipbelow=6pt
+}
+\renewenvironment{quote}{\begin{mdframed}[style=quotebox]\small}{\end{mdframed}}
+
+% Pie de pagina
+\pagestyle{fancy}
+\fancyhf{}
+\fancyfoot[C]{\small\color{footgray}Seguridad de Datos --- Gu\'ia de examen \quad|\quad \thepage}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0.4pt}

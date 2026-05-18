@@ -5,6 +5,7 @@
 ```
 Visor de eventos, directivas de seguridad, IDs de eventos y análisis forense
 ```
+
 ```
 Contenido basado en la Práctica 4 — Monitorización y Auditoría de Seguridad (parte Online)
 ```
@@ -25,7 +26,6 @@ Firewall avanzado  wf.msc             Ejecutar > wf.msc
 CONSEJO: En el examen usa SIEMPRE los comandos de consola (eventvwr, secpol, gpedit.msc)
 en lugar de navegar por menús. Es mucho más rápido.
 ```
-
 
 ## APARTADO 1: El Visor de Eventos (eventvwr)
 
@@ -57,10 +57,12 @@ Registros de aplicaciones y servicios
 #### Guardar y cargar eventos filtrados
 
 **Guardar:**
+
 - Panel derecho → "Guardar archivo de registro filtrado como..." → nombre: `EventosSegDia`
 - Formato del fichero: `.evtx`
 
 **Cargar:**
+
 - Menú Escaneo → "Abrir escaneo" (crea nueva ventana)
 - O "Abrir escaneo en esta ventana" (añade al inventario actual)
 
@@ -68,7 +70,6 @@ Registros de aplicaciones y servicios
 IMPORTANTE: Borrar un elemento de "Registros guardados" en el Visor de eventos NO borra
 el fichero .evtx del disco. Solo elimina el acceso rápido desde el visor.
 ```
-
 
 ## APARTADO 2: Directiva de Seguridad Local (secpol)
 
@@ -128,7 +129,6 @@ Ambas      Correcto + Erróneo — máxima visibilidad
 CONSEJO: Para detectar ataques de fuerza bruta activar "Erróneo" en "Auditar inicio de sesión".
 Para auditar accesos a ficheros sensibles activar "Correcto" y "Erróneo" en "Auditar sistema de archivos".
 ```
-
 
 ## APARTADO 3: IDs de Eventos de Seguridad de Windows
 
@@ -218,7 +218,7 @@ ID      Descripción
 
 ```
 ID      Descripción
-2003    Cambió una configuración de Firewall (perfil Público/Privado/Dominio)
+2003    Cambió una configuración de Firewall (perfil Público/Privado/Dominio) más general
 2006    Se eliminó una regla de la lista de excepciones
 2010    Cambió el perfil de red en una interfaz
 2033    Se eliminaron TODAS las reglas (reseteo completo del Firewall)
@@ -240,11 +240,12 @@ Registros de aplicaciones y servicios
 ```
 
 O directamente desde consola:
+
 ```
 eventvwr
 ```
-Y navegar hasta la ruta indicada.
 
+Y navegar hasta la ruta indicada.
 
 ## APARTADO 4: Flujo de Trabajo en el Examen
 
@@ -259,23 +260,27 @@ Tarea  Herramienta       Objetivo
 ```
 
 **Tarea 1 — Controles de seguridad:**
+
 - `secpol` → Directivas de cuenta → Directiva de contraseñas (longitud mínima, etc.)
 - `secpol` → Directivas de cuenta → Directiva de bloqueo de cuenta
 - Firewall → añadir/quitar reglas de entrada/salida
 - Propiedades de fichero → pestaña Seguridad → permisos de acceso
 
 **Tarea 2 — Configurar auditoría:**
+
 - `secpol` → Opciones de seguridad → habilitar "Auditoría: forzar subcategorías..."
 - `secpol` → Configuración de directiva de auditoría avanzada → seleccionar categoría
 - Para cada subcategoría: elegir Correcto, Erróneo o ambas
 
 **Tarea 3 — Generar eventos de prueba:**
+
 - Cerrar sesión e intentar login con contraseña incorrecta (2-3 veces)
 - Entrar finalmente con contraseña correcta
 - Acceder a ficheros/carpetas auditadas
 - Lanzar escaneo nmap contra el equipo para generar tráfico de red
 
 **Tarea 4 — Analizar eventos:**
+
 - `eventvwr` → Registros de Windows → Seguridad
 - Filtrar por fecha o por ID de evento
 - Buscar ID 4625 (login fallido) o 4624 (login correcto)
@@ -286,7 +291,6 @@ Tarea  Herramienta       Objetivo
 IMPORTANTE: Si el examen pide entregar un documento de auditoría, documentar CADA PASO
 con capturas de pantalla (Alt+ImprPant) y texto explicativo mínimo. Guardar en .docx.
 ```
-
 
 ## CHULETA RÁPIDA
 
@@ -334,3 +338,53 @@ Firewall                  C:\Windows\System32\winevt\Logs\
 4. **Correlación:** Si ves varios 4625 seguidos de un 4624 → intento de fuerza bruta exitoso
 5. **Cuenta bloqueada:** 4740 confirma que el mecanismo de bloqueo funcionó correctamente
 6. **Guardar filtrado:** Una vez filtrado, panel derecho → "Guardar archivo de registro filtrado como..."
+
+## PREGUNTAS TIPO EXAMEN
+
+> Basado en [ExamenNMAP_Auditoria.md](../Practica/ExamenNMAP_Auditoria.md) — Bloques B y C.
+
+### Visor de eventos
+
+**a)** Comando: `eventvwr`. Auditoría en `Registros de Windows` → **Seguridad**.
+
+**b)** Filtrar ayer: panel derecho → "Filtrar registro actual..." → Intervalo personalizado → 00:00:00 a 23:59:00.
+
+**c)** Guardar como `EventosSegDia` → extensión **`.evtx`**. Borrar en "Registros guardados" **no** borra el fichero del disco.
+
+**d)** Eventos de reglas de firewall: `Registros de aplicaciones y servicios` → `Microsoft` → `Windows` → `Windows Firewall With Advanced Security` → **Firewall**.
+
+### secpol y auditoría avanzada
+
+**a)** Paso previo: `secpol` → Directivas locales → Opciones de seguridad → **"Auditoría: forzar la configuración de subcategorías..."** → Habilitada.
+
+**b)** Contraseña incorrecta: categoría **Inicio y cierre de sesión** → **Auditar inicio de sesión** → **Erróneo** (o **Ambas**).
+
+**c)** Auditar fichero: no basta con "Auditar sistema de archivos" en secpol; hay que añadir **SACL** en Propiedades del fichero → Seguridad → Opciones avanzadas → pestaña **Auditoría**.
+
+**d)** IDs: fallido **4625**, correcto **4624**, cuenta bloqueada **4740**.
+
+### Análisis forense
+
+**a)** `4625 → 4625 → 4625 → 4624` = fuerza bruta o pruebas fallidas y luego éxito. Si sigue **4740** = cuenta bloqueada.
+
+**b)** Firewall: añadida **2097**, eliminada **2006**, todas borradas **2033** (modificada: **2099**).
+
+**c)** Evento **4625**: usuario, dominio, motivo del fallo, IP origen, fecha/hora.
+
+**d)** Verificar cambios de firewall sin tocar `secpol`: `eventvwr` → registro **Firewall** → buscar 2097/2099/2006/2033/2003 en el intervalo auditado.
+
+### Flujo completo con Nmap (Bloque C)
+
+**a)** Habilitar subcategorías → **Auditar inicio de sesión** → Correcto + Erróneo.
+
+**b)** Generar eventos: 2× login fallido + 1 correcto; desde otra máquina `nmap -T4 -A -v IP` (el escaneo no siempre deja huella en Seguridad; lo habitual son **4624/4625**).
+
+**c)** En Seguridad filtrar **4624** y **4625**; documentar usuario, timestamp y origen en el detalle del evento.
+
+**d)** Registro Firewall: si se tocó el firewall durante la práctica, correlacionar **2097** (regla añadida) u otros IDs; si solo hubo Nmap sin cambios, puede no haber eventos nuevos.
+
+```
+CONSEJO: Correlación clásica — varios 4625 + un 4624 = posible fuerza bruta exitosa;
+4740 confirma que el bloqueo de cuenta actuó.
+```
+

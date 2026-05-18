@@ -72,7 +72,7 @@ def recibir_mensaje(origen, destino, clave_compartida, mensaje_cifrado,msg_hash_
 
 import random
 
-def alterar_mensaje_cifrado(mensaje_cifrado):
+def simular_alteracion(mensaje_cifrado):
     """
     Toma un mensaje en bytes, cambia un byte aleatorio por un valor diferente,
     y devuelve el nuevo mensaje alterado.
@@ -102,7 +102,7 @@ def alterar_mensaje_cifrado(mensaje_cifrado):
     # 6. Volvemos a convertir a bytes inmutables y lo devolvemos
     return bytes(mensaje_mutable)
 
-    
+
 # ==========================================
 # MAIN
 # ==========================================

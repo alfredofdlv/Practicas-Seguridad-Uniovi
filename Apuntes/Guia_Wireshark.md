@@ -493,3 +493,62 @@ HTTPS Puerto 443 (TCP)
 DHCP Puertos 67/68 (UDP)
 ```
 
+## APARTADO 5: Análisis TLS 1.3 — Handshake en Wireshark
+
+> Basado en la Práctica 4 (captura de examen). IPs de ejemplo: cliente `192.168.0.198`, servidor `192.168.0.196`.
+
+#### ¿Puedes localizar ClientHello?
+
+Sí. Suele aparecer en un paquete concreto (ej. paquete **308**): origen cliente → destino servidor. Columna **Protocol**: TLSv1.3.
+
+#### ¿Qué versión de TLS se está utilizando?
+
+**TLSv1.3** (columna Protocol en los paquetes del handshake).
+
+#### ¿Le sigue ServerHello?
+
+Sí. Tras el ACK TCP del ClientHello, el servidor envía **Server Hello** (ej. paquete **310**).
+
+#### ¿Hay otros mensajes TLS integrados en el mismo paquete TCP que ServerHello?
+
+Sí. En TLS 1.3 Wireshark agrupa en la columna **Info** del mismo paquete, por ejemplo: **Server Hello**, **Change Cipher Spec** y **Application Data** (datos ya cifrados).
+
+#### ¿Detectas luego el mensaje ClientKeyExchange?
+
+```
+IMPORTANTE (trampa de examen): En TLS 1.3 NO aparece un mensaje llamado
+ClientKeyExchange. El intercambio de claves va en los mensajes iniciales; lo
+siguiente suele etiquetarse como Application Data genérico (paquetes 310, 311, 312).
+```
+
+Justificación: el handshake TLS 1.3 es más corto que en TLS 1.2; Wireshark no nombra
+ClientKeyExchange porque ese mensaje no existe en 1.3.
+
+#### ¿Hay más mensajes del cliente integrados en el mismo paquete TCP?
+
+Sí. En el paquete del cliente (ej. **311**) puede ir **Change Cipher Spec** + **Application Data** en el mismo segmento TCP.
+
+#### ¿Aparece finalmente el ChangeCipherSpec que envía el servidor?
+
+Sí, pero **no al final** del handshake: aparece **adelantado**, integrado en el mismo paquete que el **Server Hello** (ej. paquete 310).
+
+Filtros útiles para TLS en capturas:
+
+```
+tls
+tls.handshake.type == 1          → Client Hello
+tls.handshake.type == 2          → Server Hello
+```
+
+## PREGUNTAS TIPO EXAMEN — Nmap y captura
+
+> Complemento de [ExamenNMAP_Auditoria.md](../Practica/ExamenNMAP_Auditoria.md) Bloque D. Ver también [Guia_Nmap.md](Guia_Nmap.md).
+
+**a)** Durante `nmap -v -sn` verás ICMP Echo/Timestamp, TCP SYN (p. ej. 443) y TCP ACK (p. ej. 80); no hay escaneo de todos los puertos.
+
+**b)** Filtro solo tráfico hacia el objetivo → `ip.dst == 192.168.0.196`
+
+**c)** Tras el handshake TLS el HTTPS va cifrado; sin SSLKEYLOG no lees el contenido de aplicación.
+
+**d)** Con `nmap -sS` ves SYN y SYN-ACK, pero el escáner responde **RST** y no completa el three-way handshake (half-open).
+

@@ -5,6 +5,7 @@
 ```
 certmgr, certlm, PowerShell, formatos de certificado, exportación, importación y firma PDF
 ```
+
 ```
 Contenido basado en la Práctica 2.2 — Integridad y Autenticidad: Funciones Resumen y Certificados
 ```
@@ -27,7 +28,6 @@ También desde menú: Inicio → buscar "Certificados" → aparecen ambas herram
 CONSEJO: certmgr.msc = usuario actual. certlm.msc = equipo local (necesario para IIS).
 En el examen, si hay que instalar un cert para que lo use el servidor IIS, usar certlm.msc.
 ```
-
 
 ## APARTADO 1: Estructura del Almacén de Certificados
 
@@ -75,7 +75,6 @@ PERO la clave privada asociada NO se elimina automáticamente. Hay que borrar el
 de claves manualmente si no se quiere retener la clave privada en el sistema.
 ```
 
-
 ## APARTADO 2: Crear Certificados con PowerShell
 
 #### Preparar PowerShell — política de ejecución
@@ -93,7 +92,7 @@ Get-ExecutionPolicy    # debe devolver Unrestricted
 
 #### Crear un Certificado Raíz (Autoridad Certificadora)
 
-Guardar como `CertificadoRaiz.ps1`. El carácter `` ` `` es continuación de línea (Alt+96):
+Guardar como `CertificadoRaiz.ps1`. El carácter ``` es continuación de línea (Alt+96):
 
 ```powershell
 $cert = New-SelfSignedCertificate -Type Custom `
@@ -178,6 +177,38 @@ IMPORTANTE: -TextExtension con "ca=1" es necesario para que Firefox permita carg
 el certificado raíz en su almacén de confianza. Sin este parámetro Firefox lo rechaza.
 ```
 
+#### -KeySpec: Signature vs KeyExchange
+
+El parámetro `-KeySpec` indica para qué se usará la clave privada del certificado:
+
+```
+Valor        ¿Qué hace la clave privada?          ¿Quién lo usa?
+Signature    Solo firmar datos/certificados        Autoridad Certificadora (AC)
+KeyExchange  Firmar Y cifrar/descifrar             Servidor o usuario final
+```
+
+**Por qué la AC usa `Signature`:**
+La CA nunca necesita descifrar datos de nadie — su única función es firmar certificados
+de otros. Restringir su clave a solo firma es una buena práctica de seguridad: si la
+clave privada de la AC se comprometiera, el daño queda limitado a la emisión de
+certificados falsos, pero no podría usarse para descifrar tráfico.
+
+**Por qué servidor y usuario usan `KeyExchange`:**
+Un servidor TLS necesita tanto firmar (autenticarse durante el handshake) como
+participar en el intercambio de claves simétricas de sesión (descifrar la clave de
+sesión que el cliente envía cifrada con la clave pública del servidor). Un usuario
+también puede necesitar descifrar mensajes que le envíen cifrados con su clave pública.
+
+**Sobre la validez (-NotAfter):**
+
+```
+Tipo de certificado  Validez recomendada  Motivo
+AC (zpac.as)         10 años              Cambiarla obliga a redistribuir a todos los clientes
+Servidor (zpser.as)  5 años               Se renueva periódicamente por seguridad
+Usuario (zpusu.as)   5 años               Igual que el servidor
+```
+
+En entornos reales los certificados de servidor duran incluso menos (Let's Encrypt: 90 días).
 
 ## APARTADO 3: Formatos de Certificado
 
@@ -202,6 +233,23 @@ CONSEJO: Para el examen recordar: DER = binario (no legible), Base64 = texto (le
 PKCS#7 = cadena de certs, PKCS#12/PFX = incluye clave privada.
 ```
 
+#### Tabla para completar en examen
+
+```
+Formato    | Extensión | Clave privada | Legible bloc notas | Uso principal
+-----------|-----------|---------------|--------------------|-------------------------------
+DER        | .cer      | NO            | NO                 | Distribución estándar del cert público
+Base64     | .cer      | NO            | SÍ                 | Distribución en texto/intercambio legible
+PKCS#7     | .p7b      | NO            | NO (abre certmgr)  | Cadenas de certificados
+PKCS#12    | .pfx      | SÍ            | NO                 | Transferencia cert + clave privada
+```
+
+```
+CLAVE: Solo PKCS#12 (.pfx) incluye clave privada. DER y Base64 comparten extensión .cer
+pero DER no se puede leer con bloc de notas y Base64 sí (empieza por "-----BEGIN CERTIFICATE-----").
+Doble clic en .cer → visor de certificado. Doble clic en .pfx → asistente de importación.
+Doble clic en .p7b → se abre certmgr directamente.
+```
 
 ## APARTADO 4: Exportar Certificados
 
@@ -211,9 +259,9 @@ PKCS#7 = cadena de certs, PKCS#12/PFX = incluye clave privada.
 2. Clic derecho → "Exportar..." o menú Acción → Exportar
 3. Asistente: "¿Exportar la clave privada?" → **No**
 4. Elegir formato:
-   - `DER binario (.CER)` → recomendado para uso general
-   - `Base 64 (.CER)` → si necesitas abrirlo con bloc de notas
-   - `PKCS#7 (.P7B)` → para cadenas de certificados
+  - `DER binario (.CER)` → recomendado para uso general
+  - `Base 64 (.CER)` → si necesitas abrirlo con bloc de notas
+  - `PKCS#7 (.P7B)` → para cadenas de certificados
 5. Dar nombre al fichero (convenio: `zpACas-DER.cer`, `zpACas-B64.cer`, `zpACas-PKCS7.p7b`)
 
 ```
@@ -243,7 +291,6 @@ IMPORTANTE: La AC SOLO debe exportar su clave privada para hacer un BACKUP.
 No debe distribuirla. Solo el certificado público (zpACas.cer) es el que se distribuye.
 ```
 
-
 ## APARTADO 5: Importar Certificados
 
 #### Importar un certificado de usuario (con clave privada — .pfx)
@@ -253,9 +300,9 @@ No debe distribuirla. Solo el certificado público (zpACas.cer) es el que se dis
 3. Confirmar la ruta del fichero
 4. Introducir contraseña: `conusupfx`
 5. Opciones:
-   - Marcar la clave privada como exportable ✓
-   - Incluir propiedades extendidas del certificado ✓
-   - NO habilitar protección segura de clave privada
+  - Marcar la clave privada como exportable ✓
+  - Incluir propiedades extendidas del certificado ✓
+  - NO habilitar protección segura de clave privada
 6. Almacén: elegir manualmente → Examinar → **Personal** → "Mostrar almacenes físicos" → seleccionar el almacén físico
 7. Finalizar
 
@@ -268,7 +315,7 @@ Esto es necesario para que el sistema considere válidos todos los certificados 
 1. Doble clic sobre `zpACas.cer` → ventana Certificado → botón "Instalar certificado..."
 2. Seleccionar **Usuario actual**
 3. Almacén: elegir manualmente → **Entidades de certificación raíz de confianza**
-   - En este caso NO marcar "Mostrar almacenes físicos" (dejar que elija el asistente)
+  - En este caso NO marcar "Mostrar almacenes físicos" (dejar que elija el asistente)
 4. Aceptar la advertencia de seguridad → Finalizar
 
 ```
@@ -282,7 +329,6 @@ CONSEJO: Si el certificado no aparece tras importar, pulsar F5 o el botón "Actu
 (flecha circular verde) en certmgr.msc.
 ```
 
-
 ## APARTADO 6: Cadena de Certificación y Confianza
 
 #### Por qué es necesaria la cadena de confianza
@@ -295,10 +341,12 @@ zpusu.as ──firmado por──► zpac.as ──firmado por sí mismo──►
 ```
 
 Si `zpac.as` NO está en "Entidades de certificación raíz de confianza", el sistema muestra:
+
 - "Windows no tiene suficiente información para comprobar este certificado"
 - La pestaña "Ruta de certificación" mostrará error
 
 Una vez instalado `zpac.as` como raíz de confianza:
+
 - La ruta de certificación se muestra completa
 - Estado: "Certificado válido"
 
@@ -307,7 +355,6 @@ IMPORTANTE: Al crear un nuevo anclaje de confianza (instalar cert raíz), el sis
 confiará en TODOS los certificados emitidos por esa AC. Es una decisión de seguridad
 importante: solo instalar ACs en las que realmente se confía.
 ```
-
 
 ## APARTADO 7: Firma de PDF con Adobe Reader
 
@@ -323,10 +370,10 @@ importante: solo instalar ACs en las que realmente se confía.
 3. El cursor cambia a una cruz — arrastrar para definir el área de la firma
 4. Seleccionar el certificado a usar → "Continuar"
 5. Verificar detalles del certificado: "Ver detalles del certificado"
-   - Pestaña Detalles: información del certificado
-   - Pestaña Revocación: estado de revocación
-   - Pestaña Confianza: nivel de confianza del certificado
-   - Pestaña Normativas: políticas aplicables
+  - Pestaña Detalles: información del certificado
+  - Pestaña Revocación: estado de revocación
+  - Pestaña Confianza: nivel de confianza del certificado
+  - Pestaña Normativas: políticas aplicables
 6. Verificar que "Bloquear el documento tras la firma" NO esté marcado (para permitir más firmas)
 7. "Firmar" → guardar el fichero con un nuevo nombre
 
@@ -339,6 +386,7 @@ y además no podrá ser modificado. Usarlo solo si es la última firma del docum
 
 Tras firmar, aparece un banner en la parte superior. Acceder al Panel de Firma (esquina
 superior derecha) para:
+
 - Ver información de cada firma
 - Revisar los certificados empleados
 - Verificar que las firmas son válidas
@@ -354,6 +402,53 @@ certificados oficiales válidos. Solo sirven para pruebas o uso interno. No sirv
 firmar documentos de forma oficial ante terceros.
 ```
 
+## APARTADO 8: Extensión KeyUsage — Usos permitidos de la clave
+
+El campo `KeyUsage` en los detalles de un certificado restringe los usos permitidos
+de la clave privada asociada. Es una extensión del estándar X.509.
+
+#### Valores más comunes
+
+```
+Valor                  Significado
+DigitalSignature       La clave privada puede firmar digitalmente datos (autenticación, no repudio)
+KeyEncipherment        La clave privada puede descifrar claves simétricas cifradas con la clave pública
+CertSign               La clave privada puede firmar otros certificados (exclusivo de ACs)
+CRLSign                La clave privada puede firmar listas de revocación de certificados (CRL)
+DataEncipherment       La clave privada puede descifrar datos directamente (poco habitual)
+KeyAgreement           Para algoritmos de acuerdo de clave (ej: ECDH)
+NonRepudiation         El titular no puede negar haber firmado (no repudio)
+```
+
+#### Combinación típica de un certificado de servidor TLS/HTTPS
+
+```
+KeyUsage: DigitalSignature, KeyEncipherment
+```
+
+- `DigitalSignature` → firma el handshake TLS para autenticarse ante el cliente
+- `KeyEncipherment` → descifra la clave de sesión que el cliente envía cifrada
+con la clave pública del servidor (mecanismo RSA key exchange clásico)
+
+#### Combinación típica de una AC
+
+```
+KeyUsage: CertSign, CRLSign
+```
+
+Solo puede firmar certificados y listas de revocación — no descifrar tráfico.
+
+#### KeyUsage None (valor usado en la práctica)
+
+En los scripts de la práctica se usa `-KeyUsage None`, lo que significa que el cmdlet
+NO añade la extensión KeyUsage al certificado. Sin esta extensión, la clave puede
+usarse para cualquier propósito. Es aceptable para pruebas, pero en producción
+siempre se deben restringir los usos.
+
+```
+CONSEJO EXAMEN: Si ves "DigitalSignature, KeyEncipherment" → certificado de servidor/usuario.
+Si ves "CertSign" → certificado de una AC. Si no aparece la extensión → sin restricción de uso.
+```
 
 ## CHULETA DE REFERENCIA RÁPIDA
 
@@ -423,3 +518,27 @@ Otras personas                           Certs de otros (solo clave pública)
 3. El cert de la AC aparece en Personal tras importar un .pfx → eliminarlo y reinstalar en Raíces
 4. La clave privada NO se borra al eliminar el cert → borrar manualmente de `My\Keys` si es necesario
 5. Certificado raíz: "Emitido para == Emitido por" → se reconoce porque se firmó a sí mismo
+
+- `-TextExtension @("2.5.29.19={critical}{text}ca=1")` — añade la extensión **Basic Constraints** (OID 2.5.29.19) marcada como crítica, indicando que este certificado es una CA (`ca=1`). Sin esta extensión, Firefox rechaza el certificado cuando intentas cargarlo en su almacén de raíces de confianza, porque Firefox valida estrictamente que un cert raíz tenga esa extensión marcada como crítica. Chrome/Edge (que usan el almacén de Windows) son más permisivos y no lo exigen, pero Firefox tiene su propio motor de validación.
+
+## AFIRMACIONES TÍPICAS DE EXAMEN — VERDADERO/FALSO
+
+> Basado en apuntes de práctica (firma y cadena de confianza).
+
+**1. "Una AC es un certificado que sirve para crear otros certificados e indicar que son reales y válidos."**
+
+**Veredicto: Correcto.** La AC actúa como emisor/notario: firma certificados de usuarios y servidores. Al crearla en PowerShell se marca con la extensión `ca=1` en Basic Constraints (`2.5.29.19`).
+
+**2. "Si vas a crear un certificado de usuario o servidor necesitas tener la AC con clave privada (.pfx) para poder firmar dichos certificados."**
+
+**Veredicto: Correcto, con matiz.** Para emitir un cert hijo hace falta la **clave privada** de la AC (firmar con `-Signer $cert`). El `.pfx` es el contenedor de backup/transporte (cert + clave privada); en sesión PowerShell se usa la clave cargada en el almacén, no necesariamente el fichero `.pfx` en ese momento.
+
+**3. "Si vas a firmar con uno de los certificados creados por la AC necesitas tener el .cer de esta para indicar que con el que firmas es de confianza."**
+
+**Veredicto: Correcto.** Al firmar (p. ej. en Adobe), el sistema mira quién emitió tu certificado. Debes instalar la **clave pública** de la AC (`zpACas.cer`, sin clave privada) en **Entidades de certificación raíz de confianza** para crear el anclaje de confianza.
+
+```
+IMPORTANTE: Nunca distribuyas el .pfx de la AC a los clientes. Solo el .cer (público)
+va en raíces de confianza; el .pfx comprometería toda la PKI si se filtra.
+```
+

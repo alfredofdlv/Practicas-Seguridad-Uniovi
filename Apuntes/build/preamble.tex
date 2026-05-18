@@ -1,0 +1,22 @@
+\usepackage{fontspec}
+\usepackage{newunicodechar}
+\usepackage{amssymb}
+\newunicodechar{✓}{\checkmark}
+
+\setmainfont{Latin Modern Roman}
+\setsansfont{Latin Modern Sans}
+\setmonofont{Consolas}[Scale=0.85]
+
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{fvextra}
+\usepackage{xcolor}
+
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
+\DefineVerbatimEnvironment{verbatim}{Verbatim}{breaklines}
+
+\usepackage{titlesec}
+\titleformat{\paragraph}{\normalfont\normalsize\bfseries}{\theparagraph}{1em}{}
+\titleformat{\subparagraph}{\normalfont\normalsize\bfseries}{\thesubparagraph}{1em}{}
+\titlespacing*{\paragraph}{0pt}{1.2ex plus 0.2ex}{0.8ex}
+\titlespacing*{\subparagraph}{0pt}{1ex plus 0.2ex}{0.6ex}

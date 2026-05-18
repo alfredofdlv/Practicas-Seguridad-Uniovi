@@ -352,15 +352,190 @@ print("Firma OK" if es_valida else "Firma INVALIDA")
 
 ---
 
+## 9. FIRMA: TRES MÉTODOS COMPARADOS
+
+> Hash e integridad no son lo mismo que firma. El hash comprueba que el contenido no cambió; la firma prueba además **quién** lo envió (clave privada del emisor).
+
+### 9.1 RSA — hash interno (lo más habitual en examen)
+
+La librería `cryptography` aplica SHA256 al mensaje por dentro. Pasas el **mensaje en claro** a `.sign()` y `.verify()`.
+
+```python
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives import hashes
+from cryptography.exceptions import InvalidSignature
+
+# FIRMAR (privada del emisor)
+firma = priv.sign(
+    mensaje,
+    padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH),
+    hashes.SHA256()
+)
+
+# VERIFICAR (publica del emisor)
+try:
+    pub.verify(
+        firma, mensaje,
+        padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH),
+        hashes.SHA256()
+    )
+    print("Firma OK")
+except InvalidSignature:
+    print("Firma INVALIDA")
+```
+
+### 9.2 RSA — Prehashed (hash manual explícito)
+
+Equivalente conceptual a ECIES: tú calculas `SHA256(mensaje)` y la firma opera sobre esos **32 bytes**, no sobre el mensaje original.
+
+```python
+import hashlib
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric.utils import Prehashed
+from cryptography.exceptions import InvalidSignature
+
+msg_hash = hashlib.sha256(mensaje).digest()   # bytes, 32 — obligatorio
+
+firma = priv.sign(
+    msg_hash,
+    padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH),
+    Prehashed(hashes.SHA256())
+)
+
+try:
+    pub.verify(
+        firma, msg_hash,
+        padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH),
+        Prehashed(hashes.SHA256())
+    )
+    print("Firma OK (Prehashed)")
+except InvalidSignature:
+    print("Firma INVALIDA")
+```
+
+**Importante:** con `Prehashed`, tanto `.sign()` como `.verify()` reciben `msg_hash` (bytes), **no** `mensaje`.
+
+### 9.3 ECIES / eth_keys — hash siempre manual
+
+No existe `Prehashed` en eth_keys: siempre firmas el digest de 32 bytes.
+
+```python
+import hashlib
+from eth_keys import keys
+
+msg_hash = hashlib.sha256(mensaje).digest()   # bytes, 32
+
+priv_obj = keys.PrivateKey(bytes.fromhex(priv_hex.replace('0x', '')))
+firma_bytes = priv_obj.sign_msg_hash(msg_hash).to_bytes()
+
+pub_obj = keys.PublicKey(bytes.fromhex(pub_hex.replace('0x', '')))
+firma_obj = keys.Signature(firma_bytes)
+valida = pub_obj.verify_msg_hash(msg_hash, firma_obj)   # True / False
+print("Firma OK" if valida else "Firma INVALIDA")
+```
+
+### 9.4 HMAC-SHA256 — autenticación simétrica (no es firma asimétrica)
+
+Usa la **misma clave compartida** del canal. Da integridad + autenticidad entre quienes conocen la clave, pero **no** prueba identidad ante un tercero (cualquiera con la clave puede generar el MAC).
+
+```python
+import hmac
+import hashlib
+
+# Generar MAC (emisor y receptor comparten clave_compartida)
+mac = hmac.new(clave_compartida, mensaje, hashlib.sha256).digest()   # bytes
+
+# Verificar (usar compare_digest, no == directo)
+valido = hmac.compare_digest(mac, mac_recibido)
+print("MAC OK" if valido else "MAC INVALIDO")
+```
+
+| Método | Clave | Entrada a firmar | Uso típico |
+|--------|-------|------------------|------------|
+| RSA hash interno | Par RSA | `mensaje` (bytes) | Examen híbrido RSA |
+| RSA Prehashed | Par RSA | `sha256(m).digest()` | Cuando el enunciado pide "firmar el hash" |
+| eth_keys ECDSA | Par ECIES hex | `sha256(m).digest()` | Examen híbrido ECIES |
+| HMAC | Clave simétrica compartida | `mensaje` (bytes) | Canal Fernet sin RSA (ej. ejercicio 4 evolucionado) |
+
+---
+
+## 10. BYTES, HEX Y BASE64: CUÁNDO USAR CADA UNO
+
+### Modos de apertura de ficheros
+
+| Modo | Qué lee/escribe | Usar para |
+|------|-----------------|-----------|
+| `"rb"` / `"wb"` | `bytes` puros | Claves `.pem`, `.key`, mensajes cifrados, `medicos.txt` cifrado |
+| `"r"` / `"w"` | `str` Unicode | Claves ECIES `.txt` (hex), `usuarios.txt` en texto plano |
+| `"ab"` | añadir bytes al final | Registrar usuarios sin borrar el fichero (`CreTxt.py`) |
+
+**Error típico:** `for linea in f.read()` en modo `"rb"` itera **enteros** (0-255), no líneas. Correcto: `mode="r"` y `for linea in f:`.
+
+### Hash: digest vs hexdigest
+
+```python
+import hashlib
+
+h = hashlib.sha256(mensaje)
+
+digest_bytes  = h.digest()      # bytes, 32  → comparar, firmar, HMAC
+hex_str       = h.hexdigest()   # str, 64 chars → JSON, prints, ficheros legibles
+
+# Conversiones
+bytes.fromhex("a4b90387...")    # hex str  → bytes
+digest_bytes.hex()              # bytes    → hex str
+```
+
+### Base64 (empaquetar binario en JSON)
+
+```python
+import base64
+
+b64_str = base64.b64encode(datos_bytes).decode()   # str para JSON
+origen  = base64.b64decode(b64_str)                  # bytes originales
+```
+
+### Regla general
+
+- **Operar en Python** (cifrar, descifrar, firmar, comparar): `bytes` (`.digest()`, `b"..."`, `.encode()`).
+- **Guardar en JSON o mostrar**: mensaje y firma en **base64**; hash en **hex** (`hexdigest()`).
+- **Ficheros de usuarios** (`medicos.txt`): texto con `,` separador; salt y hash en base64 como **str** dentro de cada línea.
+
+### Tabla de conversiones rápidas
+
+| De | A | Cómo |
+|----|---|------|
+| `bytes` | hex `str` | `b.hex()` |
+| hex `str` | `bytes` | `bytes.fromhex(s)` |
+| `bytes` | base64 `str` | `base64.b64encode(b).decode()` |
+| base64 `str` | `bytes` | `base64.b64decode(s)` |
+| `str` | `bytes` | `s.encode()` |
+| `bytes` | `str` | `b.decode()` |
+
+### Formato del hash según contenedor
+
+| Situación | Formato | Ejemplo |
+|-----------|---------|---------|
+| Comparar en Python (`==`) | `.digest()` → bytes | `sha256(m).digest() == hash_guardado` |
+| JSON / texto legible | `.hexdigest()` → str hex | `payload["hash_msg"] = sha256(m).hexdigest()` |
+| Firmar con eth_keys | `.digest()` → bytes (obligatorio) | `priv.sign_msg_hash(sha256(m).digest())` |
+| Firmar RSA Prehashed | `.digest()` → bytes (obligatorio) | `priv.sign(msg_hash, ..., Prehashed(...))` |
+| Payload JSON híbrido | mensaje base64, hash hex, firma base64 | Ver sección 7 y ejercicio 3 |
+
+---
+
 ## RESUMEN DE REGLAS CLAVE
 
 ```
-CIFRAR    → usar clave PÚBLICA del RECEPTOR
+CIFRAR    → usar clave PUBLICA del RECEPTOR
 DESCIFRAR → usar clave PRIVADA del RECEPTOR
 FIRMAR    → usar clave PRIVADA del EMISOR
-VERIFICAR → usar clave PÚBLICA del EMISOR
+VERIFICAR → usar clave PUBLICA del EMISOR
 
-RSA  → claves en .pem  | padding OAEP (cifrar) y PSS (firmar)
-ECIES→ claves en .txt hex | encrypt(pub_hex, msg) / decrypt(priv_hex, msg)
-HASH → firmar el hash SHA256(msg).digest() con ECDSA
+RSA   → claves en .pem  | OAEP (cifrar) y PSS (firmar)
+ECIES → claves en .txt hex | encrypt(pub_hex, msg) / decrypt(priv_hex, msg)
+ECDSA → firmar siempre sha256(mensaje).digest() con eth_keys
+HMAC  → hmac.new(clave_compartida, mensaje, sha256).digest() — solo canal simetrico
 ```
+

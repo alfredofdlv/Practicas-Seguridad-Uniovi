@@ -35,10 +35,15 @@ Son mucho más rápidos que navegar por el Panel de control.
 2. "Activar o desactivar las características de Windows"
 3. Seleccionar casilla **Internet Information Services** con opciones por defecto → Aceptar
 
-Windows abre automáticamente los puertos HTTP (80) y HTTPS (443) en el Firewall.
-Verificar: Firewall de Windows Defender → "Permitir una aplicación..." → buscar:
+Verificar en Firewall: "Permitir una aplicación..." → marcar **Privado y Público**:
 - Servicios World Wide Web (HTTP)
 - Servicios seguros World Wide Web (HTTPS)
+
+```
+IMPORTANTE (trampa de examen): Si HTTP funciona pero HTTPS no, suele faltar marcar
+"Servicios seguros World Wide Web (HTTPS)" en el firewall. Sin puerto 443 abierto el
+certificado SSL no sirve de nada.
+```
 
 #### Cargar un certificado en IIS
 
@@ -52,6 +57,14 @@ Verificar: Firewall de Windows Defender → "Permitir una aplicación..." → bu
 ```
 IMPORTANTE: El certificado del servidor se carga en el almacén "Hospedaje de sitios web"
 del EQUIPO LOCAL (no del usuario). Usar certlm.msc para verificarlo.
+```
+
+Importar también la AC (`zpACas.cer`, **nunca** el `.pfx`) en **Entidades de certificación raíz de confianza** del **equipo local** (`certlm.msc`).
+
+```
+IMPORTANTE (pregunta de oro): Distribuir el .pfx de la AC a los clientes compromete
+toda la PKI: les das la clave privada y podrían emitir certificados falsos de confianza.
+Solo se distribuye el .cer (público).
 ```
 
 #### Crear el servidor web seguro
@@ -143,6 +156,18 @@ Método 2: Guardar en otra ubicación y luego copiar con permisos de administrad
 IMPORTANTE: El fichero hosts resuelve nombres SOLO en el equipo local donde se edita.
 Para que el cliente externo (máquina física) también resuelva, hay que editar el hosts
 en ESE equipo también.
+```
+
+#### Prueba progresiva desde el cliente externo (máquina física)
+
+1. **Por IP:** `https://TU_IP_VIRTUAL` → advertencia *"Su conexión no es privada"*; en Avanzado: **NET::ERR_CERT_COMMON_NAME_INVALID** (el cert es para `zpser.as`, no para la IP).
+2. **Por nombre sin hosts:** `https://zpser.as` → *"no se puede obtener acceso"* (DNS no resuelve).
+3. **Editar hosts** en la máquina física (Bloc de notas **como administrador**): `C:\Windows\System32\drivers\etc\hosts`, filtro "Todos los archivos", línea `192.168.0.192 zpser.as` (tu IP real).
+4. **Prueba final:** Borrar estado SSL → cerrar y reabrir navegador → `https://zpser.as` → debe verse la web con **candado** si la AC está en raíces de confianza.
+
+```
+CONSEJO: En el cliente usa certmgr.msc (usuario que navega), no certlm.msc. certlm es
+para el servidor/IIS.
 ```
 
 #### Borrar el estado SSL del navegador
@@ -394,4 +419,53 @@ Permitir  Deja pasar el tráfico que coincide con la regla
 Bloquear  Bloquea el tráfico que coincide con la regla
 Tráfico entrante por defecto:   BLOQUEADO
 Tráfico saliente por defecto:   PERMITIDO
+```
+
+## PREGUNTAS TIPO EXAMEN
+
+> Basado en [Resolucion_Examen_SSL_Firewall.md](../Practica/Resolucion_Examen_SSL_Firewall.md).
+
+### Apartado 1 — IIS y certificados
+
+- Panel central del servidor en `inetmgr`: **Certificados de servidor**; importar `zpSERas.pfx` (contraseña `conserpfx`) en almacén **Hospedaje de sitios web** → verificar en `certlm.msc` → Personal.
+- Sitio HTTPS: nombre = CN del cert (`zpser.as`), puerto 443, enlace https.
+- **Configuración de SSL:** Omitir / Aceptar / **Requerir** certificado de cliente (lo decide el servidor).
+- **Examen de directorios** crea `web.config` en la ruta del sitio.
+
+### Apartado 2 — Nombres y confianza
+
+- `hosts` solo afecta al equipo donde se edita; ruta `C:\Windows\System32\drivers\etc\hosts`.
+- Sin AC en raíces: error de autoridad no confiable; instalar `zpACas.cer` en **Entidades de certificación raíz de confianza** (`certmgr` en el cliente).
+- **Firefox** no usa el almacén de Windows → importar la AC en Firefox (Autoridades).
+
+### Apartado 3 — Firewall e ICMP
+
+- Perfiles: Dominio, Privado, Público. Entrante bloqueado / saliente permitido por defecto.
+- **Ping no usa puertos** → habilitar regla predefinida **petición eco ICMPv4 de entrada** (no crear regla de puerto).
+- Windows envía **4** pings por defecto.
+
+### Apartado 4 — Regla de salida (solo una IP)
+
+- Regla personalizada de **salida**, protocolo cualquiera, acción **Bloquear**, ámbito remoto en dos rangos:
+  - `0.0.0.0` → `192.168.1.199`
+  - `192.168.1.201` → `255.255.255.255`
+- La IP `192.168.1.200` queda en el hueco y sigue permitida por la política por defecto.
+
+### Apartado 5 — IPsec (ejercicios propuestos)
+
+- En `wf.msc`: **Reglas de seguridad de conexión** (no solo firewall) para exigir IPsec.
+- Reglas de firewall = **unilaterales**; IPsec = **bilaterales** (política compatible en ambos extremos).
+- Registros en `eventvwr`: `Windows Firewall With Advanced Security` → **Seguridad de conexión** vs **detallada**.
+
+#### Resumen rápido
+
+```
+Cert IIS          → Certificados de servidor; certlm.msc
+CN del sitio      → Debe coincidir con URL (CN/SAN)
+SSL cliente       → Omitir / Aceptar / Requerir
+EDGE + AC         → zpACas.cer en Raíces de confianza
+Firefox           → Importar AC en su propio almacén
+ICMP              → Sin puertos; regla eco ICMPv4
+Salida 1 IP       → Dos rangos de bloqueo dejando hueco en .200
+IPsec             → Bilateral; firewall normal = unilateral
 ```

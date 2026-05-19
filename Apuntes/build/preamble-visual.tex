@@ -1,22 +1,21 @@
-\usepackage{fontspec}
 \usepackage{newunicodechar}
 \usepackage{amssymb}
 \newunicodechar{✓}{\checkmark}
 
-\setmainfont{Latin Modern Roman}
-\setsansfont{Latin Modern Sans}
-\setmonofont{Consolas}[Scale=0.85]
-
 \usepackage{xcolor}
 \usepackage{booktabs}
 \usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{array}
 \usepackage{fvextra}
 \usepackage{framed}
 \usepackage{tcolorbox}
 \tcbuselibrary{skins,breakable}
 \usepackage{titlesec}
+\usepackage{enumitem}
 \usepackage{fancyhdr}
 \usepackage{hyperref}
+\usepackage{etoolbox}
 
 % Paleta
 \definecolor{titleblue}{HTML}{1B4F72}
@@ -28,8 +27,12 @@
 \definecolor{importantebg}{HTML}{FEF5E7}
 \definecolor{codebg}{HTML}{F4F6F7}
 \definecolor{codeframe}{HTML}{D5D8DC}
+\definecolor{tableheadbg}{HTML}{D6EAF8}
+\definecolor{tableheadtext}{HTML}{1B4F72}
+\definecolor{tablerowalt}{HTML}{F8F9F9}
 \definecolor{quotebar}{HTML}{2874A6}
 \definecolor{footgray}{HTML}{7F8C8D}
+\definecolor{listbullet}{HTML}{2874A6}
 
 \hypersetup{colorlinks=true, linkcolor=sectionblue, urlcolor=sectionblue, citecolor=sectionblue}
 
@@ -48,17 +51,37 @@
 \titlespacing*{\paragraph}{0pt}{1.2ex plus 0.2ex}{0.8ex}
 \titlespacing*{\subparagraph}{0pt}{1ex plus 0.2ex}{0.6ex}
 
-% Cajas CONSEJO / IMPORTANTE (Divs del filtro Lua)
+% Listas mas legibles
+\setlist[itemize]{
+  leftmargin=1.4em,
+  topsep=5pt,
+  itemsep=4pt,
+  parsep=2pt,
+  label=\textcolor{listbullet}{\textbullet}
+}
+\setlist[enumerate]{
+  leftmargin=1.6em,
+  topsep=5pt,
+  itemsep=5pt,
+  parsep=2pt,
+  label=\textcolor{sectionblue}{\bfseries\arabic*.}
+}
+\setlist[description]{
+  leftmargin=1.6em,
+  font=\bfseries\color{subgray},
+  style=nextline,
+  topsep=5pt,
+  itemsep=4pt
+}
+
+% Cajas CONSEJO / IMPORTANTE
 \newtcolorbox{consejobox}{
   breakable,
   colback=consejobg,
   colframe=consejoframe,
   boxrule=0.8pt,
   arc=3pt,
-  left=6pt,
-  right=6pt,
-  top=4pt,
-  bottom=4pt,
+  left=6pt, right=6pt, top=4pt, bottom=4pt,
   fonttitle=\bfseries,
   title={Consejo}
 }
@@ -68,23 +91,59 @@
   colframe=importanteframe,
   boxrule=0.8pt,
   arc=3pt,
-  left=6pt,
-  right=6pt,
-  top=4pt,
-  bottom=4pt,
+  left=6pt, right=6pt, top=4pt, bottom=4pt,
   fonttitle=\bfseries,
   title={Importante}
 }
 \newenvironment{consejo}{\begin{consejobox}}{\end{consejobox}}
 \newenvironment{importante}{\begin{importantebox}}{\end{importantebox}}
 
-% Bloques de codigo resaltados (python, powershell) con fondo gris
-\definecolor{shadecolor}{HTML}{F4F6F7}
+% Bloques monospace (intro, comandos sueltos)
+\newtcolorbox{codeboxinner}{
+  breakable,
+  colback=codebg,
+  colframe=codeframe,
+  boxrule=0.5pt,
+  arc=2pt,
+  left=4pt, right=4pt, top=3pt, bottom=3pt
+}
+\newtcolorbox{treeboxinner}{
+  breakable,
+  colback=codebg,
+  colframe=sectionblue!40,
+  boxrule=0.6pt,
+  arc=2pt,
+  left=4pt, right=4pt, top=3pt, bottom=3pt,
+  title={\small Estructura},
+  coltitle=sectionblue,
+  fonttitle=\bfseries\small
+}
+\newenvironment{codebox}{\begin{codeboxinner}}{\end{codeboxinner}}
+\newenvironment{treebox}{\begin{treeboxinner}}{\end{treeboxinner}}
 
+% Tablas ASCII convertidas desde Markdown
+\newtcolorbox{tablebox}{
+  breakable,
+  colback=tableheadbg!15,
+  colframe=sectionblue!50,
+  boxrule=0.6pt,
+  arc=2pt,
+  left=5pt, right=5pt, top=5pt, bottom=5pt,
+  before upper={\small}
+}
+
+% Codigo resaltado (python, powershell)
+\definecolor{shadecolor}{HTML}{F4F6F7}
 \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
 \DefineVerbatimEnvironment{verbatim}{Verbatim}{breaklines}
 
-% Citas con barra lateral
+% Tablas Markdown (longtable de Pandoc)
+\newcommand{\real}[1]{#1}
+\renewcommand{\arraystretch}{1.35}
+\setlength{\tabcolsep}{7pt}
+\AtBeginEnvironment{longtable}{\small}
+\AtBeginEnvironment{table}{\small}
+% Citas
 \usepackage{mdframed}
 \mdfdefinestyle{quotebox}{
   linecolor=quotebar,

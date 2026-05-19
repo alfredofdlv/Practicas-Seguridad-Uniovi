@@ -5,3 +5,8 @@ geometry: margin=2cm
 fontsize: 11pt
 toc: false
 numbersections: false
+mainfont: Latin Modern Roman
+sansfont: Latin Modern Sans
+monofont: Consolas
+monofontoptions:
+  - Scale=0.85

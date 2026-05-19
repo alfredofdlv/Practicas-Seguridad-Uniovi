@@ -5,6 +5,23 @@
 
 ---
 
+## KIT DE FUNCIONES (copiar / pegar)
+
+- **Todas las funciones listas:** `Criptografia/FuncionesResumen/kit_examen_cripto.py`
+- **Índice con tabla maestra y snippets:** `Apuntes/Indice_Funciones_Cripto.md`
+
+```python
+# Uso directo (copiar kit_examen_cripto.py al directorio de trabajo):
+from kit_examen_cripto import (
+    rsa_generar, rsa_guardar_pem, rsa_cargar_pem,
+    hibrido_rsa_cifrar_firma_interna, hibrido_rsa_descifrar_firma_interna,
+    autentica_usuario, generar_token_sesion, cadena_enviar_ab,
+    # ... ver Indice_Funciones_Cripto.md para la lista completa
+)
+```
+
+---
+
 ## CONCEPTO HÍBRIDO (leer si hay dudas)
 
 **Problema:** RSA no puede cifrar mensajes grandes. Fernet es rápido pero requiere compartir la clave.
@@ -289,6 +306,8 @@ except InvalidSignature:
     print("ERROR: firma invalida")
 ```
 
+**Firma interna (mensaje + firma dentro del Fernet):** ver sección 11. Archivo de referencia: `Criptografia/Examen-Enero/Ejercicio-Hibrido-RSA-FirmaInterna.py`.
+
 ---
 
 ## 7. HÍBRIDO ECIES + Fernet
@@ -521,7 +540,312 @@ origen  = base64.b64decode(b64_str)                  # bytes originales
 | JSON / texto legible | `.hexdigest()` → str hex | `payload["hash_msg"] = sha256(m).hexdigest()` |
 | Firmar con eth_keys | `.digest()` → bytes (obligatorio) | `priv.sign_msg_hash(sha256(m).digest())` |
 | Firmar RSA Prehashed | `.digest()` → bytes (obligatorio) | `priv.sign(msg_hash, ..., Prehashed(...))` |
-| Payload JSON híbrido | mensaje base64, hash hex, firma base64 | Ver sección 7 y ejercicio 3 |
+| Payload JSON híbrido | mensaje base64, hash hex, firma base64 | Ver sección 11 |
+
+---
+
+## 11. EMPAQUETAR MENSAJE + FIRMA
+
+> En el híbrido con **firma interna**, antes de `Fernet.encrypt()` hay que unir `mensaje` y `firma` en un solo `bytes` (payload). Luego ese payload es lo que cifra Fernet. Los ejemplos usan RSA PSS; el empaquetado sirve igual con ECDSA si codificas la firma en base64 o binario.
+> Referencia: `Criptografia/Examen-Enero/Ejercicio-Hibrido-RSA-FirmaInterna.py`
+
+| Método | Formato | Cuándo usarlo |
+|--------|---------|---------------|
+| JSON + base64 | `{"mensaje":"...","firma":"..."}` | **Más probable** (Ronda1/2, examen enero) |
+| CSV con comas | `msg_b64,firma_b64` | Igual que líneas de `medicos.txt`; `split(",")` |
+| Separador pipe | `msg_b64\|firma_b64` | Si el enunciado pide `\|` |
+| Dos líneas | `msg_b64` + `\n` + `firma_b64` | Fichero o payload legible |
+| Binario: firma al final | `mensaje + firma_bytes` | RSA 2048 → firma **256 bytes** fijos |
+| Binario: prefijo longitud | `struct` 4 bytes + firma + mensaje | Cualquier tamaño de firma |
+
+```mermaid
+flowchart LR
+  msg[mensaje_bytes] --> sign[RSA_sign_PSS]
+  sign --> pack[empaquetar_msg_firma]
+  pack --> fernet[Fernet_encrypt_payload]
+  fernet --> rsa[RSA_OAEP_clave_fernet]
+```
+
+**Integración al híbrido (todos los métodos):**
+
+```python
+payload_bytes = empaquetar_...(mensaje, priv_origen)   # o firmar antes y empaquetar
+payload_cifrado = Fernet(clave_fernet).encrypt(payload_bytes)
+# clave_fernet se cifra con RSA OAEP del receptor (como en sección 6)
+```
+
+Imports y padding RSA (reutilizar en todos los bloques de abajo):
+
+```python
+import json
+import base64
+import struct
+from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
+from cryptography.hazmat.primitives import hashes
+from cryptography.exceptions import InvalidSignature
+
+PSS = asym_padding.PSS(
+    mgf=asym_padding.MGF1(hashes.SHA256()),
+    salt_length=asym_padding.PSS.MAX_LENGTH,
+)
+```
+
+### 11.1 JSON + base64 (estándar examen)
+
+```python
+# Requiere imports de arriba (json, base64, hashes, PSS, InvalidSignature)
+
+def empaquetar_json(mensaje, priv_origen):
+    firma = priv_origen.sign(mensaje, PSS, hashes.SHA256())
+    payload = {
+        "mensaje": base64.b64encode(mensaje).decode(),
+        "firma":   base64.b64encode(firma).decode(),
+    }
+    return json.dumps(payload).encode()
+
+def desempaquetar_json(payload_bytes, pub_emisor):
+    payload = json.loads(payload_bytes.decode())
+    mensaje = base64.b64decode(payload["mensaje"])
+    firma   = base64.b64decode(payload["firma"])
+    try:
+        pub_emisor.verify(firma, mensaje, PSS, hashes.SHA256())
+        return mensaje, True
+    except InvalidSignature:
+        return mensaje, False
+```
+
+### 11.2 CSV con comas (como `medicos.txt`)
+
+Mismo patrón que `nombre,salt_b64,hash_b64`. Con base64 en los campos **no aparecen comas** en el payload. No uses coma si empaquetas texto en claro con comas dentro.
+
+```python
+def empaquetar_coma(mensaje, priv_origen):
+    firma = priv_origen.sign(mensaje, PSS, hashes.SHA256())
+    linea = f"{base64.b64encode(mensaje).decode()},{base64.b64encode(firma).decode()}"
+    return linea.encode()
+
+def desempaquetar_coma(payload_bytes, pub_emisor):
+    msg_b64, firma_b64 = payload_bytes.decode().split(",", 1)
+    mensaje = base64.b64decode(msg_b64)
+    firma   = base64.b64decode(firma_b64)
+    try:
+        pub_emisor.verify(firma, mensaje, PSS, hashes.SHA256())
+        return mensaje, True
+    except InvalidSignature:
+        return mensaje, False
+```
+
+### 11.3 Separador pipe
+
+```python
+def empaquetar_pipe(mensaje, priv_origen):
+    firma = priv_origen.sign(mensaje, PSS, hashes.SHA256())
+    linea = f"{base64.b64encode(mensaje).decode()}|{base64.b64encode(firma).decode()}"
+    return linea.encode()
+
+def desempaquetar_pipe(payload_bytes, pub_emisor):
+    msg_b64, firma_b64 = payload_bytes.decode().split("|", 1)
+    mensaje = base64.b64decode(msg_b64)
+    firma   = base64.b64decode(firma_b64)
+    try:
+        pub_emisor.verify(firma, mensaje, PSS, hashes.SHA256())
+        return mensaje, True
+    except InvalidSignature:
+        return mensaje, False
+```
+
+### 11.4 Dos líneas
+
+```python
+def empaquetar_dos_lineas(mensaje, priv_origen):
+    firma = priv_origen.sign(mensaje, PSS, hashes.SHA256())
+    texto = base64.b64encode(mensaje).decode() + "\n" + base64.b64encode(firma).decode()
+    return texto.encode()
+
+def desempaquetar_dos_lineas(payload_bytes, pub_emisor):
+    msg_b64, firma_b64 = payload_bytes.decode().splitlines()
+    mensaje = base64.b64decode(msg_b64)
+    firma   = base64.b64decode(firma_b64)
+    try:
+        pub_emisor.verify(firma, mensaje, PSS, hashes.SHA256())
+        return mensaje, True
+    except InvalidSignature:
+        return mensaje, False
+```
+
+### 11.5 Binario: firma al final (RSA 2048, sin base64)
+
+Con clave RSA 2048 y PSS, la firma ocupa siempre **256 bytes**.
+
+```python
+TAM_FIRMA_RSA2048 = 256
+
+def empaquetar_binario_fijo(mensaje, priv_origen):
+    firma = priv_origen.sign(mensaje, PSS, hashes.SHA256())
+    return mensaje + firma
+
+def desempaquetar_binario_fijo(paquete, pub_emisor):
+    mensaje = paquete[:-TAM_FIRMA_RSA2048]
+    firma   = paquete[-TAM_FIRMA_RSA2048:]
+    try:
+        pub_emisor.verify(firma, mensaje, PSS, hashes.SHA256())
+        return mensaje, True
+    except InvalidSignature:
+        return mensaje, False
+```
+
+### 11.6 Binario: prefijo de longitud (`struct`)
+
+Sirve para cualquier tamaño de firma (RSA, ECDSA, etc.).
+
+```python
+def empaquetar_struct(mensaje, priv_origen):
+    firma = priv_origen.sign(mensaje, PSS, hashes.SHA256())
+    return struct.pack(">I", len(firma)) + firma + mensaje
+
+def desempaquetar_struct(paquete, pub_emisor):
+    tam = struct.unpack(">I", paquete[:4])[0]
+    firma   = paquete[4 : 4 + tam]
+    mensaje = paquete[4 + tam :]
+    try:
+        pub_emisor.verify(firma, mensaje, PSS, hashes.SHA256())
+        return mensaje, True
+    except InvalidSignature:
+        return mensaje, False
+```
+
+**Evitar en examen:** `pickle`, concatenar texto en claro sin codificar, o separadores ambiguos si el mensaje puede contener el mismo carácter.
+
+---
+
+## 12. CIFRAR FICHEROS COMPLETOS
+
+> Archivo simple: `Criptografia/Cifrado Simetrico/Archivo/cifra_descifra_sim_file.py`
+> Patrón práctica (admin + PBKDF2): `Practica/Ronda2/Cifrar Autentica + Hibrido/Open/registro.py`
+
+### 12.1 Fernet con clave en fichero (simple)
+
+```python
+from cryptography.fernet import Fernet
+
+# Generar y guardar clave
+clave = Fernet.generate_key()
+with open("clave.key", "wb") as f:
+    f.write(clave)
+
+# Cifrar fichero completo
+with open("clave.key", "rb") as f:
+    clave = f.read()
+with open("documento.txt", "rb") as f:
+    contenido = f.read()
+
+token = Fernet(clave).encrypt(contenido)
+with open("documento.txt.enc", "wb") as f:
+    f.write(token)
+
+# Descifrar fichero completo
+with open("documento.txt.enc", "rb") as f:
+    datos_cifrados = f.read()
+contenido = Fernet(clave).decrypt(datos_cifrados)
+with open("documento_descifrado.txt", "wb") as f:
+    f.write(contenido)
+```
+
+### 12.2 Fichero protegido por contraseña admin (`medicos.txt.enc`)
+
+Flujo Ronda2: editar `medicos.txt` en texto → cifrar **todo el fichero** con Fernet → guardar `medicos.txt.enc`. Para autenticar, descifrar en memoria y recorrer líneas CSV.
+
+```python
+import os
+import base64
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.fernet import Fernet
+
+ADMIN_SALT = b"hospital_admin_salt_v1"
+ITERACIONES = 100_000
+
+def derivar_clave_maestra(contrasena_admin: str) -> bytes:
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=ADMIN_SALT,
+        iterations=ITERACIONES,
+        backend=default_backend(),
+    )
+    return base64.urlsafe_b64encode(kdf.derive(contrasena_admin.encode()))
+
+def cifrar_fichero_medicos(ruta_txt: str, ruta_enc: str, contrasena_admin: str) -> None:
+    with open(ruta_txt, "rb") as f:
+        contenido = f.read()
+    clave = derivar_clave_maestra(contrasena_admin)
+    token = Fernet(clave).encrypt(contenido)
+    with open(ruta_enc, "wb") as f:
+        f.write(token)
+    os.remove(ruta_txt)   # opcional: borrar plano tras cifrar
+
+def descifrar_fichero_medicos(ruta_enc: str, contrasena_admin: str) -> str:
+    with open(ruta_enc, "rb") as f:
+        datos_cifrados = f.read()
+    clave = derivar_clave_maestra(contrasena_admin)
+    return Fernet(clave).decrypt(datos_cifrados).decode("utf-8")
+```
+
+**Formato interno** (contenido del TXT tras descifrar): una línea por usuario  
+`nombre,salt_b64,hash_pwd_b64`
+
+```python
+def hasheo_password(contrasena: str, salt: bytes) -> str:
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(), length=32, salt=salt,
+        iterations=ITERACIONES, backend=default_backend(),
+    )
+    return base64.b64encode(kdf.derive(contrasena.encode())).decode()
+
+def verifica_password(contrasena: str, salt: bytes, hash_almacenado: str) -> bool:
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(), length=32, salt=salt,
+        iterations=ITERACIONES, backend=default_backend(),
+    )
+    try:
+        kdf.verify(contrasena.encode(), base64.b64decode(hash_almacenado))
+        return True
+    except Exception:
+        return False
+
+# Autenticar: descifrar y buscar línea
+contenido = descifrar_fichero_medicos("medicos.txt.enc", contrasena_admin)
+for linea in contenido.splitlines():
+    nombre, salt_b64, hash_b64 = linea.strip().split(",")
+    if nombre != usuario:
+        continue
+    salt = base64.b64decode(salt_b64)
+    if verifica_password(contrasena, salt, hash_b64):
+        print("Autenticado")
+```
+
+**Alta de usuario** (escribir en claro y volver a cifrar):
+
+```python
+def alta_usuario(nombre, contrasena, contrasena_admin, ruta_txt="medicos.txt"):
+    salt = os.urandom(16)
+    hash_pwd = hasheo_password(contrasena, salt)
+    nueva = f"{nombre},{base64.b64encode(salt).decode()},{hash_pwd}\n"
+    texto = ""
+    if os.path.exists(ruta_txt):
+        with open(ruta_txt, "r", encoding="utf-8") as f:
+            texto = f.read()
+    with open(ruta_txt, "w", encoding="utf-8") as f:
+        f.write(texto + nueva)
+    cifrar_fichero_medicos(ruta_txt, "medicos.txt.enc", contrasena_admin)
+```
+
+| Fichero | Modo `open` | Contenido |
+|---------|-------------|-----------|
+| `medicos.txt` | `"r"` / `"w"` utf-8 | Texto CSV antes de cifrar |
+| `medicos.txt.enc` | `"rb"` / `"wb"` | Token Fernet (bytes) |
+| `clave.key`, `*.pem` | `"rb"` / `"wb"` | Claves binarias |
 
 ---
 
@@ -537,5 +861,12 @@ RSA   → claves en .pem  | OAEP (cifrar) y PSS (firmar)
 ECIES → claves en .txt hex | encrypt(pub_hex, msg) / decrypt(priv_hex, msg)
 ECDSA → firmar siempre sha256(mensaje).digest() con eth_keys
 HMAC  → hmac.new(clave_compartida, mensaje, sha256).digest() — solo canal simetrico
+
+EMPAQUETAR → JSON (examen) | CSV coma (medicos) | binario 256B (RSA fijo)
+FICHERO     → read rb → Fernet.encrypt → write wb (.enc)
+CLAVE ADMIN → PBKDF2 + salt fijo → urlsafe_b64encode → Fernet
+
+KIT         → Criptografia/FuncionesResumen/kit_examen_cripto.py
+INDICE      → Apuntes/Indice_Funciones_Cripto.md
 ```
 

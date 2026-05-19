@@ -1,4 +1,3 @@
----
 
 ## EJERCICIOS PROPUESTOS (HASH + CIFRADO)
 
@@ -23,6 +22,7 @@ sequenceDiagram
 
 
 
+
 **Tareas:**
 
 1. `enviar_AB()`: calcular `hash1 = SHA256(mensaje).digest()`, cifrar con Fernet clave_AB, retornar `(cifrado, hash1)`.
@@ -40,7 +40,6 @@ mensaje_BC = b"Factura validada por B. Autorizar pago."
 
 **Pista examen:** el hash viaja en **bytes** (`digest()`); solo usar `hexdigest()` si el enunciado pide guardarlo en JSON o fichero texto.
 
----
 
 ### Ejercicio E — Auth + fichero cifrado + token de sesión en el hash del mensaje
 
